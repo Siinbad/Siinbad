@@ -1,0 +1,941 @@
+# BEN KOCIENSKI, 3 IN A ROW board game
+
+.data
+
+    # Array for Game Board
+    column1: .space 24
+    column2: .space 24
+    column3: .space 24
+    
+    # Messages
+    welcome:  .asciiz "Open the game: "
+    prompt:   .asciiz "Enter int (1,2,3) to place chip in corresponding column: "
+    newLinem: .asciiz "\n"
+    youWin:   .asciiz "Congratulations! You are the winner!"
+    youLose:  .asciiz "You lose! Too bad!"
+    sMate:    .asciiz "Board is full! It is a tie!"
+    error1:   .asciiz "Move invalid, enter an integer (1,2,3)"
+    error2:   .asciiz "Move invalid, Column is full, try again."
+    
+    # Characters for game
+    blueChip:   .asciiz "[@] "    # Human chip (int value of 2)
+    redChip:    .asciiz "[0] "    # Computer chip (int value of 5)
+    spaceChip:  .asciiz "[ ] "    # Blank space  (int value of 0, default)
+    
+.text
+
+# Set chip values (2 is humman chip, blue, and 5 is computer chip, red)
+addi $s4, $zero, 2
+addi $s5, $zero, 5
+addi $s6, $zero, 0 # Value to determine whos turn
+addi $s7, $zero, 1 # index for choice of computer
+addi $t6, $zero, 0 # value for last column played in (for ai)
+    	
+# Set column array index to max (we subtract index in order to generate board)
+addi $s1, $zero, 20
+addi $s2, $zero, 20
+addi $s3, $zero, 20
+
+    # Welcome the user
+    la $a0, welcome
+    li $v0, 4
+    syscall
+        
+    # Print new line
+    li $v0, 4
+    la $a0, newLinem
+    syscall
+    
+    # Generate empty board, then begin game
+    j generate
+    	
+    main:
+  	# This function runs a game of "3 in a row". A game board is generated every turn, and a User plays against a computer until we have a winner
+        # Print new line
+    	li $v0, 4
+    	la $a0, newLinem
+    	syscall
+    	
+        # If there are 3 in a row, end the program and announce the winner
+        beq $s0, 1, exit
+        	
+        # Determine whos turn it is, then do that turn. Generate board after turn.
+        beq $s6, 0, userTurn
+        beq $s6, 1, compTurn
+           
+    generate: 
+        # Function for printing the Board of the game. First, we reset our index values t0 and t1
+        # Next, we determine which column to print value from to generate the board
+        # We print 1 value from each column until board is done printing
+    	
+
+    	
+        addi $t0, $zero, 0 # index for array printing
+        addi $t1, $zero, 0 # index for new line
+        
+        while:
+            # exit after printing the board
+            beq $t0, 24, checkWinner
+            
+            # Prints a new line if 3 values have been printed, AND increments array values (t1 = 3)
+            beq $t1, 3, newLine
+            
+            # determine which column to print from
+            beq $t1, 0, printColumn1
+            beq $t1, 1, printColumn2
+            beq $t1, 2, printColumn3
+            
+            # Branch to appropriate chip function (blue = 1, red = 2, blank = 3)
+            beq $t2, 1, printBlue
+            beq $t2, 2, printRed
+            beq $t2, 0, printSpace
+            
+            j while
+            # end of generate
+     
+         # Functions for printing columns
+         printColumn1:
+         	lw $t2, column1($t0)
+         	
+         	# Branch to appropriate chip function (blue = 1, red = 2, blank = 3)
+            	beq $t2, 2, printBlue
+           	beq $t2, 5, printRed
+           	beq $t2, 0, printSpace  
+         
+         printColumn2:
+         	lw $t2, column2($t0)
+         	
+         	# Branch to appropriate chip function (blue = 1, red = 2, blank = 3)
+            	beq $t2, 2, printBlue
+           	beq $t2, 5, printRed
+           	beq $t2, 0, printSpace  
+         
+         printColumn3:
+         	lw $t2, column3($t0)
+         	
+         	# Branch to appropriate chip function (blue = 1, red = 2, blank = 3)
+            	beq $t2, 2, printBlue
+           	beq $t2, 5, printRed
+           	beq $t2, 0, printSpace  
+         
+     
+         # Chip printing for Generate    
+     	 printBlue:
+     		# Print a blue chip, then return to while in generate
+        	la $a0, blueChip
+        	li $v0, 4
+        	syscall
+        
+        	addi $t1, $t1, 1 # increase new line index by 1
+        	j while
+        
+     	 printRed:
+     		# Print a red chip, then return to while in generate
+        	la $a0, redChip
+        	li $v0, 4
+        	syscall
+        
+        	addi $t1, $t1, 1 # increase new line index by 1
+        	j while
+        
+     	 printSpace: 
+     		# Print a space chip, then return to while in generate
+        	la $a0, spaceChip
+        	li $v0, 4
+        	syscall
+        
+        	addi $t1, $t1, 1 # increase new line index by 1
+        	j while
+     
+     	 newLine:
+        	# Conditional function to print a new line  
+        	li $v0, 4
+        	la $a0, newLinem
+        	syscall
+        	
+        	# rest index, increment array, and return to generate, while
+        	addi $t1, $zero, 0
+        	addi $t0, $t0, 4
+        	j while
+     #-=-=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-= -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-= -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=  -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=   
+     userTurn: 
+     	# Program to complete the users turn. This program will get int from user that correpsonds to the column of choice
+     	# Program will then determine spot of array to place into.
+     	
+     	# Reset indexes, set s6 to computer's turn
+     	addi $t0, $zero, 0 # index for user column choice
+     	addi $s6, $zero, 1
+     	
+     	# Prompt the user to enter an int
+     	la $a0, prompt
+        li $v0, 4
+        syscall
+        
+        # Store the int to t0
+        li $v0, 5
+        syscall
+        move $t0, $v0
+        
+        # Check for errors, first if input is invalid integer
+        blt $t0, 1, uerror1
+        bgt $t0, 3, uerror1
+        
+        # Check if column is full
+        addi $t1, $zero, 0 # To store the sum of user input and column value to see if user placed in a full column
+        addu $t1, $t0, $s1
+        beq $t1, -3, uerror2
+        
+        addi $t1, $zero, 0 # column2 check
+        addu $t1, $t0, $s2
+        beq $t1, -2, uerror2
+        
+        addi $t1, $zero, 0 # column3 check
+        addu $t1, $t0, $s3
+        beq $t1, -1, uerror2
+                       
+        
+        # Place blue chip in corresponding column
+        beq $t0, 1, placeIn1
+        beq $t0, 2, placeIn2
+        beq $t0, 3, placeIn3
+        
+        
+        
+        # Functions for placing in correct column
+        placeIn1:
+        	# place blueChip (int: 1) into column 1, then increment column
+        	sw $s4, column1($s1)
+        	subi $s1, $s1, 4
+        	addi $t6, $zero, 1 # set last move 
+        	
+        	# generate the new board
+     		j generate
+        
+        placeIn2:
+        	# place blueChip (int: 1) into column 2, then increment column
+        	sw $s4, column2($s2)
+        	subi $s2, $s2, 4
+        	addi $t6, $zero, 2 # set last move 
+        	
+        	# generate the new board
+     		j generate
+        
+        placeIn3:
+        	# place blueChip (int: 1) into column 3, then increment column
+        	sw $s4, column3($s3)
+        	subi $s3, $s3, 4
+        	addi $t6, $zero, 3 # set last move 
+        	
+        	# generate the new board
+     		j generate
+        
+     #-=-=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-= -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-= -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=  -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=   
+     compTurn:
+     	# Program to complete the Computers turn. This program will *very simple a.i. for testing purposes
+     	# Program will then determine spot of array to place into.
+     	
+     	# Wait 1.2 seconds to make output more smooth change later
+     	la $a0, 1200
+   	li $v0, 32
+   	syscall
+     	
+     	# Reset indexes, set s6 to user's turn
+        addi $s6, $zero, 0
+        
+        # MAKE MOVE
+        
+        # Firstly go in winning position if can
+        # Similarly to checkWinner, check every possible winning condition and test to see where to place
+        # If sum of 3 lines plus 5 is 15, we can win
+        addi $t1, $zero, 0
+        addi $t2, $zero, 0
+        addi $t3, $zero, 0
+        addi $t4, $zero, 24
+        cTestHorizontal:
+        	subi $t4, $t4, 4 # NEXT ROW
+     		beq, $t4, -4, cTestVertical
+     		addi $t3, $zero, 0 # Reset sum
+     	
+     		lw $t1, column1($t4) # Load values for current row
+     		lw $t2, column2($t4)
+     		lw $t7, column3($t4)
+     	
+     		addu $t3, $t1, $t2 # Get sum, if sum = 15, we can win
+     		addu $t3, $t3, $t7
+     		addi $t3, $t3, 5
+    	 	beq $t3, 15, HorizontalWin
+    	 	
+    	 	j cTestHorizontal
+        
+        	HorizontalWin:
+        		# We can win horizontally. find where to go
+        		lw $t1, column1($t4) # Load values for current row
+     			lw $t2, column2($t4)
+     			lw $t3, column3($t4)
+     			beq $t1, 0, compPlaceIn1
+     			beq $t2, 0, compPlaceIn2
+     			beq $t3, 0, compPlaceIn3
+     	
+     	cTestVertical:
+     	addi $t7, $zero, 12 # value for 1st array spot
+        addi $t8, $zero, 16 # value for 2nd array spot
+        addi $t9, $zero, 20 # value for 3rd array spot
+     		cVerticalLoop:
+     		# Reset indexes 
+     		addi $t0, $zero, 0
+     		addi $t1, $zero, 0
+     		addi $t2, $zero, 0
+     		
+            	beq $t7, -4, cTestDiagonal
+            	
+        	lw $t0, column1($t7) # Load values for column 1
+     		lw $t1, column1($t8)
+     		lw $t2, column1($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 15 we can win
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 5
+    		beq $t3, 15, VerticalWin1
+    	
+    		lw $t0, column2($t7) # Load values for column 2
+     		lw $t1, column2($t8)
+     		lw $t2, column2($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1 # Get sum, if sum = 15 we can win
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 5
+    		beq $t3, 15, VerticalWin2
+    	
+    		lw $t0, column3($t7) # Load values for column 3
+     		lw $t1, column3($t8)
+     		lw $t2, column3($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1 # Get sum, if sum = 15 we can win
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 5
+    		beq $t3, 15, VerticalWin3
+    		
+    		# increment spaces and loop
+    		subi $t7, $t7, 4 # value for 1st array spot
+        	subi $t8, $t8, 4 # value for 2nd array spot
+        	subi $t9, $t9, 4 # value for 3rd array spot
+    		
+    		j cVerticalLoop
+    		
+    		VerticalWin1:
+    			# Find where to go
+    			lw $t0, column1($t7) # Load values for column 1
+     			lw $t1, column1($t8)
+     			lw $t2, column1($t9)
+     			beq $t0, 0, compPlaceIn1
+     			beq $t1, 0, compPlaceIn1
+     			beq $t2, 0, compPlaceIn1
+     		VerticalWin2:	
+     			lw $t0, column2($t7) # Load values for column 2
+     			lw $t1, column2($t8)
+     			lw $t2, column2($t9)
+     			beq $t0, 0, compPlaceIn2
+     			beq $t1, 0, compPlaceIn2
+     			beq $t2, 0, compPlaceIn2
+     		VerticalWin3:	
+     			lw $t0, column3($t7) # Load values for column 3
+     			lw $t1, column3($t8)
+     			lw $t2, column3($t9)
+     			beq $t0, 0, compPlaceIn3
+     			beq $t1, 0, compPlaceIn3
+     			beq $t2, 0, compPlaceIn3
+     	
+     	cTestDiagonal:
+     	addi $t7, $zero, 20 # value for 1st array spot
+        addi $t8, $zero, 16 # value for 2nd array spot
+        addi $t9, $zero, 12 # value for 3rd array spot
+        
+	     cDiagonalLoop:
+	     # Test for 1st kind of stripe
+		beq $t7, -4, blockTest    # jump to final test when done
+		
+		lw $t0, column1($t7) # Load values for "positive" stripe
+     		lw $t1, column2($t8)
+     		lw $t2, column3($t9)
+     		
+     		addi $t3, $zero, 0   # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 5
+    		beq $t3, 15, diagonalWin1
+    	    
+    	    # Test for 2nd kind of stripe
+    	    	lw $t0, column1($t9) # Load values for "negative" stripe
+     		lw $t1, column2($t8)
+     		lw $t2, column3($t7)
+     		
+     		addi $t3, $zero, 0   # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 5
+    		beq $t3, 15, diagonalWin2
+    	    	
+    	    # Increment array spots, then loop
+    	    	subi $t7, $t7, 4 
+        	subi $t8, $t8, 4 
+        	subi $t9, $t9, 4 
+        	
+        	j cDiagonalLoop
+        	
+        	diagonalWin1:
+        		# Find spot
+        		lw $t0, column1($t7) # Load values for "positive" stripe
+     			lw $t1, column2($t8)
+     			lw $t2, column3($t9)
+     			beq $t0, 0, compPlaceIn1
+     			beq $t1, 0, compPlaceIn2
+     			beq $t2, 0, compPlaceIn3
+        	diagonalWin2:
+     			lw $t0, column1($t9) # Load values for "negative" stripe
+     			lw $t1, column2($t8)
+     			lw $t2, column3($t7)
+     			beq $t0, 0, compPlaceIn1
+     			beq $t1, 0, compPlaceIn2
+     			beq $t2, 0, compPlaceIn3
+        
+        # Next, block user if have to 
+        
+        # Similarly to previous chunk of code, check every possible winning condition and test to see where to place (to prevent user win)
+        blockTest:
+        
+        # If sum of 3 lines plus 2 is 6, we must block
+        addi $t1, $zero, 0
+        addi $t2, $zero, 0
+        addi $t3, $zero, 0
+        addi $t4, $zero, 24
+        bTestHorizontal:
+        	subi $t4, $t4, 4 # NEXT ROW
+     		beq, $t4, -4, bTestVertical
+     		addi $t3, $zero, 0 # Reset sum
+     	
+     		lw $t1, column1($t4) # Load values for current row
+     		lw $t2, column2($t4)
+     		lw $t7, column3($t4)
+     	
+     		addu $t3, $t1, $t2 # Get sum, if sum = 6, we must block
+     		addu $t3, $t3, $t7
+     		addi $t3, $t3, 2
+    	 	beq $t3, 6, HorizontalBlock
+    	 	
+    	 	j bTestHorizontal
+        
+        	HorizontalBlock:
+        		# We can block horizontally. find where to go
+        		lw $t1, column1($t4) # Load values for current row
+     			lw $t2, column2($t4)
+     			lw $t3, column3($t4)
+     			beq $t1, 0, compPlaceIn1
+     			beq $t2, 0, compPlaceIn2
+     			beq $t3, 0, compPlaceIn3
+     	
+     	bTestVertical:
+     	addi $t7, $zero, 12 # value for 1st array spot
+        addi $t8, $zero, 16 # value for 2nd array spot
+        addi $t9, $zero, 20 # value for 3rd array spot
+     		bVerticalLoop:
+     		# Reset indexes 
+     		addi $t0, $zero, 0
+     		addi $t1, $zero, 0
+     		addi $t2, $zero, 0
+     		
+            	beq $t7, -4, bTestDiagonal
+            	
+        	lw $t0, column1($t7) # Load values for column 1
+     		lw $t1, column1($t8)
+     		lw $t2, column1($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, we must block
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 2
+    		beq $t3, 6, VerticalBlock1
+    	
+    		lw $t0, column2($t7) # Load values for column 2
+     		lw $t1, column2($t8)
+     		lw $t2, column2($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1 # Get sum, if sum = 6, we must block
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 2
+    		beq $t3, 6, VerticalBlock2
+    	
+    		lw $t0, column3($t7) # Load values for column 3
+     		lw $t1, column3($t8)
+     		lw $t2, column3($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1 # Get sum, if sum = 6, we must block
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 2
+    		beq $t3, 6, VerticalBlock3
+    		
+    		# increment spaces and loop
+    		subi $t7, $t7, 4 # value for 1st array spot
+        	subi $t8, $t8, 4 # value for 2nd array spot
+        	subi $t9, $t9, 4 # value for 3rd array spot
+    		
+    		j bVerticalLoop
+    		
+    		VerticalBlock1:
+    			# Find where to go
+    			lw $t0, column1($t7) # Load values for column 1
+     			lw $t1, column1($t8)
+     			lw $t2, column1($t9)
+     			beq $t0, 0, compPlaceIn1
+     			beq $t1, 0, compPlaceIn1
+     			beq $t2, 0, compPlaceIn1
+     		VerticalBlock2:	
+     			lw $t0, column2($t7) # Load values for column 2
+     			lw $t1, column2($t8)
+     			lw $t2, column2($t9)
+     			beq $t0, 0, compPlaceIn2
+     			beq $t1, 0, compPlaceIn2
+     			beq $t2, 0, compPlaceIn2
+     		VerticalBlock3:	
+     			lw $t0, column3($t7) # Load values for column 3
+     			lw $t1, column3($t8)
+     			lw $t2, column3($t9)
+     			beq $t0, 0, compPlaceIn3
+     			beq $t1, 0, compPlaceIn3
+     			beq $t2, 0, compPlaceIn3
+     	
+     	bTestDiagonal:
+     	addi $t7, $zero, 20 # value for 1st array spot
+        addi $t8, $zero, 16 # value for 2nd array spot
+        addi $t9, $zero, 12 # value for 3rd array spot
+        
+	     bDiagonalLoop:
+	     # Test for 1st kind of stripe
+		beq $t7, -4, shouldMiddle    # jump to final test when done
+		
+		lw $t0, column1($t7) # Load values for "positive" stripe
+     		lw $t1, column2($t8)
+     		lw $t2, column3($t9)
+     		
+     		addi $t3, $zero, 0   # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, we must block
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 2
+    		beq $t3, 6, diagonalBlock1
+    	    
+    	    # Test for 2nd kind of stripe
+    	    	lw $t0, column1($t9) # Load values for "negative" stripe
+     		lw $t1, column2($t8)
+     		lw $t2, column3($t7)
+     		
+     		addi $t3, $zero, 0   # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, we must block
+     		addu $t3, $t3, $t2
+     		addi $t3, $t3, 2
+    		beq $t3, 6, diagonalBlock2
+    	    	
+    	    # Increment array spots, then loop
+    	    	subi $t7, $t7, 4 
+        	subi $t8, $t8, 4 
+        	subi $t9, $t9, 4 
+        	
+        	j bDiagonalLoop
+        	
+        	diagonalBlock1:
+        		# Find spot
+        		lw $t0, column1($t7) # Load values for "positive" stripe
+     			lw $t1, column2($t8)
+     			lw $t2, column3($t9)
+     			beq $t0, 0, compPlaceIn1
+     			beq $t1, 0, compPlaceIn2
+     			beq $t2, 0, compPlaceIn3
+        	diagonalBlock2:
+     			lw $t0, column1($t9) # Load values for "negative" stripe
+     			lw $t1, column2($t8)
+     			lw $t2, column3($t7)
+     			beq $t0, 0, compPlaceIn1
+     			beq $t1, 0, compPlaceIn2
+     			beq $t2, 0, compPlaceIn3
+     			
+        # Lastly, make an educated guess xD
+        
+ 	j shouldMiddle
+ 	
+ 	beq $s7, 0, compPlaceIn1
+ 	beq $s7, 1, compPlaceIn2
+ 	beq $s7, 2, compPlaceIn3
+ 	
+ 	# Conditional, where do I go?
+ 	whichSide:
+ 		# If we are not to go in the middle, go to side with least pieces, best outcome
+ 		bgt $s1, $s3, compPlaceIn1
+ 		j compPlaceIn3
+ 	
+ 	shouldMiddle:
+ 		# If middle is highest, go middle
+ 		blt $s2, $s1, midCheck2
+ 		j continue
+ 		midCheck2:
+ 		blt $s2, $s3, compPlaceIn2
+ 		continue:
+ 		
+ 		# If layers are flat, go middle!
+ 		addi $t1, $zero, 0 # row number
+ 		
+ 		beq $t6, 1, SMset1 # using last move to test that column
+ 		beq $t6, 2, SMset2
+ 		beq $t6, 3, SMset3
+ 		
+ 		SMset1:
+ 			addi $t1, $s1, 0
+ 			j SMconclusion
+ 		
+ 		SMset2:
+ 			addi $t1, $s2, 0
+ 			j SMconclusion
+ 			
+ 		SMset3:
+ 			addi $t1, $s3, 0
+ 			j SMconclusion
+ 		
+ 		SMconclusion:
+ 			addi $t1, $t1, 4 # increment t1 to previous layer
+ 			# if any value is not 0, branch to which side
+ 			lw $t2, column1($t1)
+ 			lw $t3, column2($t1)
+ 			lw $t4, column3($t1)
+ 			beq $t2, 0, whichSide
+ 			beq $t3, 0, whichSide
+ 			beq $t4, 0, whichSide
+ 			# If the sides are greater than the middle, it is not flat so go to which side
+ 			bgt $s2, $s1, whichSide
+ 			bgt $s2, $s3, whichSide
+ 			# Also test the next previous layer if it exists
+ 			beq $t1, 20, compPlaceIn2 # (it doesnt exist)
+ 			subi $t1, $t1, 4 # set to next previous, do same thing
+ 			lw $t2, column1($t1)
+ 			lw $t3, column2($t1)
+ 			lw $t4, column3($t1)
+ 			beq $t2, 0, whichSide
+ 			beq $t3, 0, whichSide
+ 			beq $t4, 0, whichSide
+ 			
+ 			j compPlaceIn2			 			
+ 			
+ 		
+        # Functions for placing in correct column
+        compPlaceIn1:
+        	# Firstly, if column is full, attempt to place in next column
+        	beq $s1, -4, compPlaceIn2
+        	
+        	# place redChip (int: 5) into column 1, then increment column
+        	sw $s5, column1($s1)
+        	subi $s1, $s1, 4
+        	
+        	# Change computer next move
+        	addi $s7, $s7, 1
+        	
+        	# generate the new board
+     		j generate
+        
+        compPlaceIn2:
+      		# Firstly, if column is full, attempt to place in next column
+        	beq $s2, -4, compPlaceIn3
+        	
+        	# If middle is empty, DO NOT go to MIDDLE
+        	beq $s2, 20, whichSide
+        	
+        	# place redChip (int: 5) into column 2, then increment column
+        	sw $s5, column2($s2)
+        	subi $s2, $s2, 4
+        	
+        	# Change computer next move
+        	addi $s7, $s7, 1       	
+        	
+        	# generate the new board
+     		j generate
+        
+        compPlaceIn3:
+        	# Firstly, if column is full, attempt to place in next column
+        	beq $s3, -4, compPlaceIn1
+        	
+        	# place redChip (int: 5) into column 3, then increment column
+        	sw $s5, column3($s3)
+        	subi $s3, $s3, 4
+        	
+        	# Change computer next move
+        	addi $s7, $zero, 0
+        	
+        	
+        	# generate the new board
+     		j generate
+     	
+     #-=-=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-= -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-= -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=  -=-=-=-=-=-=--=-==-=-=-=-=-=-=-=-=	    
+     	        
+     checkWinner:
+     	# Check for a winner. If we have a winner, set $s0 to either 1 or 2, which correlates to the winner
+     	# Start by resetting values
+     	addi $t0, $zero, 0 # value for 1st chip
+        addi $t1, $zero, 0 # value for 2nd chip
+        addi $t2, $zero, 0 # value for 3rd chip
+        addi $t3, $zero, 0 # Value for sum of 3 chips; if sum = 6, then user wins. if sum = 15, then computer wins.
+        addi $t5, $zero, 0 # Index for looping
+        
+     	# Test for horizontal win by testing EVERY row in a loop   	
+     	addi $t4, $zero, 24 # value to represent current row being tested
+     	
+     	rowLoop:
+     		subi $t4, $t4, 4 # NEXT ROW
+     		beq, $t4, -4, testVertical
+     		addi $t3, $zero, 0 # Reset sum
+     	
+     		lw $t0, column1($t4) # Load values for current row
+     		lw $t1, column2($t4)
+     		lw $t2, column3($t4)
+     	
+     		addu $t3, $t0, $t1 # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		beq $t3, 6, userWin
+    	 	beq $t3, 15, compWin
+    	 	
+    	 	j rowLoop
+     	
+     	testVertical:
+     	# Test for all verticle ways to win. This can be done by checking all possible ways for each array (column)
+     	# There are 4 ways to win in each column, with values 0,1,2 | 1,2,3 | 2,3,4 | 3,4,5 (we test each of these spaces for each column)
+     	addi $t7, $zero, 12 # value for 1st array spot
+        addi $t8, $zero, 16 # value for 2nd array spot
+        addi $t9, $zero, 20 # value for 3rd array spot
+        
+            verticalLoop:
+            	beq $t7, -4, testDiagonal
+            	
+        	lw $t0, column1($t7) # Load values for column 1
+     		lw $t1, column1($t8)
+     		lw $t2, column1($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		beq $t3, 6, userWin
+    		beq $t3, 15, compWin
+    	
+    		lw $t0, column2($t7) # Load values for column 2
+     		lw $t1, column2($t8)
+     		lw $t2, column2($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1 # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		beq $t3, 6, userWin
+    		beq $t3, 15, compWin
+    	
+    		lw $t0, column3($t7) # Load values for column 3
+     		lw $t1, column3($t8)
+     		lw $t2, column3($t9)
+     		
+     		addi $t3, $zero, 0 # Reset sum
+     		addu $t3, $t0, $t1 # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		beq $t3, 6, userWin
+    		beq $t3, 15, compWin
+    		
+    		# increment spaces and loop
+    		subi $t7, $t7, 4 # value for 1st array spot
+        	subi $t8, $t8, 4 # value for 2nd array spot
+        	subi $t9, $t9, 4 # value for 3rd array spot
+    		
+    		j verticalLoop
+    	
+    	testDiagonal:
+     	# Test for every possible diagnol win. There are 2 diagonal stripes, and 4 ways for each stripe to form
+     	# First we test for 'positive' stripes (line is like an increasing linear function: /), then the other
+     	addi $t7, $zero, 20 # value for 1st array spot
+        addi $t8, $zero, 16 # value for 2nd array spot
+        addi $t9, $zero, 12 # value for 3rd array spot
+        
+	     diagonalLoop:
+	     # Test for 1st kind of stripe
+		beq $t7, -4, finalTest    # jump to final test when done
+		
+		lw $t0, column1($t7) # Load values for "positive" stripe
+     		lw $t1, column2($t8)
+     		lw $t2, column3($t9)
+     		
+     		addi $t3, $zero, 0   # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		beq $t3, 6, userWin
+    		beq $t3, 15, compWin
+    	    
+    	    # Test for 2nd kind of stripe
+    	    	lw $t0, column1($t9) # Load values for "negative" stripe
+     		lw $t1, column2($t8)
+     		lw $t2, column3($t7)
+     		
+     		addi $t3, $zero, 0   # Reset sum
+     		addu $t3, $t0, $t1   # Get sum, if sum = 6, user wins. If sum = 15, Comp wins. Else, next test
+     		addu $t3, $t3, $t2
+     		beq $t3, 6, userWin
+    		beq $t3, 15, compWin
+    	    	
+    	    # Increment array spots, then loop
+    	    	subi $t7, $t7, 4 
+        	subi $t8, $t8, 4 
+        	subi $t9, $t9, 4 
+        	
+        	j diagonalLoop	
+     	
+     	finalTest:
+     	# Lastly, check if board is full and that there is no winner
+     	addi $t3, $zero, 0   # Reset sum
+     	addu $t3, $s2, $s3   # Get sum, if sum = -12, all columns are full!
+     	addu $t3, $t3, $s1
+     	beq $t3, -12, staleMate
+    	
+     	j main	     
+     	
+     		userWin:
+     		# We have a winner, set $s0 to 1 and announce that user has won
+     		addi $s0, $zero, 1
+     		
+     		li $v0, 4
+    		la $a0, newLinem
+    		syscall
+     		# message
+       		la $a0, youWin
+       		li $v0, 4
+      		syscall
+      		
+      		addi $t1, $zero, 0 # index
+      		winTheme:
+      		# Play a song of defeat
+      		beq $t1, 4, main
+      		# Play a sound
+		li $v0,31
+		la $a0,72
+		addi $t2,$a0,12
+		la $a1,100
+		la $a3, 127
+		la $a2, 114
+		move $t2,$a0
+		move $t3,$a1
+		syscall
+		
+		# Wait .2 seconds
+     		la $a0, 200
+   		li $v0, 32
+   		syscall
+		
+		# Play a sound
+		li $v0,31
+		la $a0,69
+		addi $t2,$a0,12
+		la $a1,100
+		la $a3, 127
+		la $a2, 114
+		move $t2,$a0
+		move $t3,$a1
+		syscall
+      		
+      		addi $t1, $t1, 1
+      		
+      		j winTheme
+     		
+     		compWin:
+     		# We have a winner, set $s0 to 1 and announce that computer has won
+     		addi $s0, $zero, 1
+     		
+     		li $v0, 4
+    		la $a0, newLinem
+    		syscall
+     		# message
+       		la $a0, youLose
+       		li $v0, 4
+      		syscall
+      		
+      		addi $t1, $zero, 0 # index
+      		loseTheme:
+      		# Play a song of defeat
+      		beq $t1, 6, main
+      		# Play a sound
+		li $v0,31
+		la $a0,39
+		addi $t2,$a0,12
+		la $a1,100
+		la $a3, 127
+		la $a2, 99
+		move $t2,$a0
+		move $t3,$a1
+		syscall
+		
+		# Wait .2 seconds
+     		la $a0, 200
+   		li $v0, 32
+   		syscall
+		
+		# Play a sound
+		li $v0,31
+		la $a0,63
+		addi $t2,$a0,12
+		la $a1,100
+		la $a3, 127
+		la $a2, 3
+		move $t2,$a0
+		move $t3,$a1
+		syscall
+      		
+      		addi $t1, $t1, 1
+      		
+      		j loseTheme
+      		
+      		staleMate:
+      		# We do not have a winner, set $s0 to 1 and announce that it is a tie
+     		addi $s0, $zero, 1
+     		
+     		li $v0, 4
+    		la $a0, newLinem
+    		syscall
+     		# message
+       		la $a0, sMate
+       		li $v0, 4
+      		syscall
+      		
+      		j main
+     
+     	           
+     	uerror1:
+     		# display message and return to userturn
+ 	 	 la $a0, error1
+   		 li $v0, 4
+   		 syscall
+   		 # Print new line
+    		 li $v0, 4
+   		 la $a0, newLinem
+   		 syscall
+		j userTurn
+	
+	uerror2:
+     		# display message and return to userturn
+ 	 	 la $a0, error2
+   		 li $v0, 4
+   		 syscall
+   		 # Print new line
+ 		   li $v0, 4
+ 		   la $a0, newLinem
+ 		   syscall
+   		 
+		j userTurn		           
+     exit:
+        # Tell system this is end of program
+        li $v0, 10
+        syscall
+       
+        
+        
+        
+             
